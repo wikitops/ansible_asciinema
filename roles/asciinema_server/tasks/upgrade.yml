@@ -1,0 +1,29 @@
+---
+
+- name: ASCIINEMA SERVER | Stop services
+  command: docker-compose stop
+  args:
+    chdir: "{{ asciinema_server_source_dir }}"
+
+- name: ASCIINEMA SERVER | Download sources from repository
+  git:
+    repo: "{{ asciinema_server_git_repository }}"
+    dest: "{{ asciinema_server_source_dir }}"
+    version: "{{ asciinema_server_git_branch }}"
+    update: yes
+    force: yes
+
+- name: ASCIINEMA SERVER | Configure production environment
+  template:
+    src: "opt/asciinema_server/env.production.j2"
+    dest: "{{ asciinema_server_source_dir }}/.env.production"
+    owner: root
+    group: root
+    mode: 0644
+
+- name: ASCIINEMA SERVER | Upgade
+  command: docker-compose --rm phoenix upgrade
+  args:
+    chdir: "{{ asciinema_server_source_dir }}"
+    creates: /tmp/ascinnema_server_setup
+  notify: Start asciinema server

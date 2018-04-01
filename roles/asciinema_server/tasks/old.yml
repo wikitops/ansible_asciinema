@@ -1,0 +1,161 @@
+---
+
+- name: ASCIINEMA SERVER | Install prerequisites packages
+  apt:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - docker-compose
+
+- name: ASCIINEMA SERVER | Download sources from repository
+  git:
+    repo: "{{ asciinema_server_git_repository }}"
+    dest: "{{ asciinema_server_source_dir }}"
+    version: "{{ asciinema_server_git_branch }}"
+    update: no
+
+- name: ASCIINEMA SERVER | Manage directories
+  file:
+    state: directory
+    path: "{{ item }}"
+    owner: root
+    group: root
+    mode: 0755
+  with_items:
+    - "{{ asciinema_server_log_dir }}"
+    - "{{ asciinema_server_volumes_dir }}"
+    - "{{ asciinema_server_uploads_dir }}"
+
+- name: ASCIINEMA SERVER | Configure production environment
+  template:
+    src: "opt/asciinema_server/env.production.j2"
+    dest: "{{ asciinema_server_source_dir }}/.env.production"
+    owner: root
+    group: root
+    mode: 0644
+  tags: asciinema_server_config
+
+- name: ASCIINEMA SERVER | Setup
+  docker_service:
+    state: present
+    project_name: asciinema_server
+    definition:
+      version: '2'
+      services:
+        postgres:
+          image: postgres
+          container_name: asciinema_postgres
+          restart: unless-stopped
+          volumes:
+            - "{{ asciinema_server_volumes_dir }}/postgres:/var/lib/postgresql/data"
+        phoenix:
+          build: "{{ asciinema_server_source_dir }}"
+          image: asciinema/asciinema-server:latest
+          command: setup
+          container_name: asciinema_phoenix
+          restart: unless-stopped
+          links:
+            - redis
+            - postgres
+            - smtp
+          env_file: "{{ asciinema_server_source_dir }}/.env.production"
+          ### Uncomment for access to ExqUI (for debugging):
+          # ports:
+          #   - "4040:4040"
+          volumes:
+            - "{{ asciinema_server_uploads_dir }}:/app/uploads"
+            - /tmp/asciinema-web:/tmp
+        smtp:
+          image: namshi/smtp
+          container_name: asciinema_smtp
+          restart: unless-stopped
+          env_file: "{{ asciinema_server_source_dir }}/.env.production"
+        redis:
+          image: redis
+          container_name: asciinema_redis
+          restart: unless-stopped
+          volumes:
+            - "{{ asciinema_server_volumes_dir }}/redis:/data"
+  tags: setup
+
+- name: ASCIINEMA SERVER | Stop
+  docker_container:
+    name: asciinema_phoenix
+    state: absent
+  tags: stop
+
+- name: ASCIINEMA SERVER | Init Docker services
+  docker_service:
+    state: present
+    project_name: asciinema_server
+    definition:
+      version: '2'
+      services:
+        postgres:
+          image: postgres
+          container_name: asciinema_postgres
+          restart: unless-stopped
+          volumes:
+            - "{{ asciinema_server_volumes_dir }}/postgres:/var/lib/postgresql/data"
+        smtp:
+          image: namshi/smtp
+          container_name: asciinema_smtp
+          restart: unless-stopped
+          env_file: "{{ asciinema_server_source_dir }}/.env.production"
+        redis:
+          image: redis
+          container_name: asciinema_redis
+          restart: unless-stopped
+          volumes:
+            - "{{ asciinema_server_volumes_dir }}/redis:/data"
+        phoenix:
+          build: "{{ asciinema_server_source_dir }}"
+          image: asciinema/asciinema-server:latest
+          command: mix phx.server
+          container_name: asciinema_phoenix
+          restart: unless-stopped
+          links:
+            - redis
+            - postgres
+            - smtp
+          env_file: "{{ asciinema_server_source_dir }}/.env.production"
+          ### Uncomment for access to ExqUI (for debugging):
+          # ports:
+          #   - "4040:4040"
+          volumes:
+            - "{{ asciinema_server_uploads_dir }}:/app/uploads"
+            - /tmp/asciinema-web:/tmp
+        rails:
+          build: .
+          image: asciinema/asciinema-server:latest
+          command: bundle exec unicorn -c config/unicorn.rb
+          container_name: asciinema_rails
+          restart: unless-stopped
+          links:
+            - redis
+            - postgres
+          env_file: "{{ asciinema_server_source_dir }}/.env.production"
+          volumes:
+            - "{{ asciinema_server_uploads_dir }}:/app/uploads"
+            - "{{ asciinema_server_log_dir }}:/app/log"
+            - /tmp/asciinema-web:/tmp
+            - "{{ asciinema_server_volumes_dir }}/tmp:/app/tmp"
+        nginx:
+          image: nginx:alpine
+          container_name: asciinema_nginx
+          restart: unless-stopped
+          links:
+            - phoenix
+            - rails
+          ports:
+            - "3000:80"
+            ### Uncomment for HTTPS:
+            # - "443:443"
+          volumes:
+            - "{{ asciinema_server_source_dir }}/docker/nginx/asciinema.conf:/etc/nginx/conf.d/default.conf:ro"
+            - "{{ asciinema_server_volumes_dir }}/cache:/cache"
+            ## Uncomment for HTTPS (make sure to add your cert and private key to ./certs):
+             # - "{{ asciinema_server_source_dir }}//certs:/app/priv/certs"
+          ## See https://hub.docker.com/_/nginx/ for more configuration options for
+          ## this image.
+  tags: up

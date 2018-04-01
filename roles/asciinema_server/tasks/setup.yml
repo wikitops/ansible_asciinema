@@ -1,0 +1,51 @@
+---
+
+- name: ASCIINEMA SERVER | Install prerequisites packages
+  apt:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - docker-compose
+
+- name: ASCIINEMA SERVER | Download sources from repository
+  git:
+    repo: "{{ asciinema_server_git_repository }}"
+    dest: "{{ asciinema_server_source_dir }}"
+    version: "{{ asciinema_server_git_branch }}"
+    update: no
+
+- name: ASCIINEMA SERVER | Manage directories
+  file:
+    state: directory
+    path: "{{ item }}"
+    owner: root
+    group: root
+    mode: 0755
+  with_items:
+    - "{{ asciinema_server_log_dir }}"
+    - "{{ asciinema_server_volumes_dir }}"
+    - "{{ asciinema_server_uploads_dir }}"
+
+- name: ASCIINEMA SERVER | Configure production environment
+  template:
+    src: "opt/asciinema_server/{{ item.src }}.j2"
+    dest: "{{ asciinema_server_source_dir }}/{{ item.dest }}"
+    owner: root
+    group: root
+    mode: 0644
+  with_items:
+    - { src: "env.production", dest: ".env.production"}
+    - { src: "docker-compose.yml", dest: "docker-compose.yml"}
+
+- name: ASCIINEMA SERVER | Init Postgres
+  command: docker-compose up -d postgres
+  args:
+    chdir: "{{ asciinema_server_source_dir }}"
+  when: not asciinema_server_external_postgres
+
+- name: ASCIINEMA SERVER | Setup
+  command: docker-compose run --rm phoenix setup
+  args:
+    chdir: "{{ asciinema_server_source_dir }}"
+    creates: /tmp/ascinnema_server_setup
+  notify: Start asciinema server

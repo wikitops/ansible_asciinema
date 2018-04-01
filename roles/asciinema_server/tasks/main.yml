@@ -1,0 +1,21 @@
+---
+
+- name: ASCIINEMA SERVER | Check deployment
+  stat:
+    path: /tmp/ascinnema_server_setup
+  register: setup
+
+- name: ASCIINEMA SERVER | Setup
+  import_tasks: setup.yml
+  when: not setup.stat.exists
+  tags: setup
+
+- name: ASCIINEMA SERVER | Upgrade
+  import_tasks: upgrade.yml
+  when: setup.stat.exists
+  tags: upgrade
+
+- name: ASCIINEMA SERVER | Update
+  import_tasks: update.yml
+  when: setup.stat.exists
+  tags: update

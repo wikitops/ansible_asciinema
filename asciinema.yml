@@ -1,0 +1,15 @@
+---
+
+- hosts: asciinema_server
+  remote_user: vagrant
+  become: yes
+  roles:
+    - asciinema_server
+  tags: server
+
+- hosts: asciinema_recorder01
+  remote_user: vagrant
+  become: yes
+  roles:
+    - asciinema_recorder
+  tags: recorder

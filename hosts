@@ -1,0 +1,8 @@
+[asciinema_server01]
+10.0.3.91
+
+[asciinema_server:children]
+asciinema_server01
+
+[asciinema_recorder01]
+10.0.3.101

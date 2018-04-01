@@ -1,0 +1,3 @@
+---
+
+asciinema_recorder_url: "http://{{ groups['asciinema_server'][0] }}"

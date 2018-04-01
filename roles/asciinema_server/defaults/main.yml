@@ -1,0 +1,17 @@
+---
+
+asciinema_server_git_repository: https://github.com/asciinema/asciinema-server.git
+asciinema_server_git_branch: master
+asciinema_server_source_dir: /opt/asciinema_server
+
+asciinema_server_url_scheme: "http"
+asciinema_server_url_host: "{{ inventory_hostname }}"
+asciinema_server_url_port: "80"
+asciinema_server_secret_key_base: "g1taRxO5eKBlV92Fr/DEfcOUEdoVm4xP5LtzoJNtMGFxogSRJerOw7cG3O0ce2nz"
+asciinema_server_mailname: "{{ inventory_hostname }}"
+
+asciinema_server_log_dir: /var/log/asciinema_server
+asciinema_server_uploads_dir: "{{ asciinema_server_source_dir }}_uploads"
+asciinema_server_volumes_dir: "{{ asciinema_server_source_dir }}_volumes"
+
+asciinema_server_external_postgres: false
